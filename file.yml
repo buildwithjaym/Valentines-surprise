@@ -1,0 +1,16 @@
+
+---
+
+## Setup (Local)
+1. Download / clone this repo
+2. Make sure your song exists at:
+   - `song.m4a`
+3. Open `index.html` in a browser
+
+> For best local testing (audio + assets), use a simple local server.
+
+### Quick local server options
+**VS Code Live Server**  
+- Install “Live Server” extension → right click `index.html` → “Open with Live Server”
+
+
