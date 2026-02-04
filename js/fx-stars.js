@@ -1,88 +1,134 @@
 function StarsFX(canvas) {
     const ctx = canvas.getContext("2d");
-    let w = 0, h = 0, dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    let w = 0, h = 0, dpr = 1;
 
     const stars = [];
     const sparks = [];
     let mode = "soft";
 
+    function rand(a, b) { return a + Math.random() * (b - a); }
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
     function resize() {
+        dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
         w = Math.floor(window.innerWidth * dpr);
         h = Math.floor(window.innerHeight * dpr);
         canvas.width = w;
         canvas.height = h;
+        seed();
     }
-
-    function rand(a, b) { return a + Math.random() * (b - a); }
 
     function seed() {
         stars.length = 0;
-        const count = Math.floor((window.innerWidth * window.innerHeight) / 9000);
+        const area = window.innerWidth * window.innerHeight;
+        const base = Math.floor(area / 9000);
+        const count = clamp(base, 80, 220);
+
         for (let i = 0; i < count; i++) {
             stars.push({
                 x: Math.random() * w,
                 y: Math.random() * h,
                 r: rand(0.6, 1.8) * dpr,
-                tw: rand(0.006, 0.02),
-                a: rand(0.15, 0.85)
-            });
-        }
-    }
-
-    function burst() {
-        for (let i = 0; i < 28; i++) {
-            sparks.push({
-                x: w * 0.5 + rand(-20, 20) * dpr,
-                y: h * 0.38 + rand(-20, 20) * dpr,
-                vx: rand(-2.2, 2.2) * dpr,
-                vy: rand(-3.2, 1.2) * dpr,
-                life: rand(28, 60),
-                a: 1
+                a: rand(0.10, 0.55),
+                target: rand(0.25, 0.95),
+                speed: rand(0.008, 0.030),
+                hold: rand(0, 90),
+                tint: Math.random() < 0.18 ? 1 : 0
             });
         }
     }
 
     function setMode(m) { mode = m; }
 
-    function draw() {
-        ctx.clearRect(0, 0, w, h);
+    function burst() {
+        const cx = w * 0.5;
+        const cy = h * 0.38;
+        for (let i = 0; i < 26; i++) {
+            sparks.push({
+                x: cx + rand(-22, 22) * dpr,
+                y: cy + rand(-22, 22) * dpr,
+                vx: rand(-2.0, 2.0) * dpr,
+                vy: rand(-3.0, 1.0) * dpr,
+                life: rand(26, 58),
+                max: 58
+            });
+        }
+    }
 
-        // base stars
-        for (const s of stars) {
-            s.a += Math.sin((performance.now() * s.tw)) * 0.002;
-            const alpha = Math.max(0.05, Math.min(1, s.a));
+    function drawStar(s) {
+        const a = clamp(s.a, 0, 1);
+
+        if (mode === "glow") {
             ctx.beginPath();
-            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+            ctx.arc(s.x, s.y, s.r * 2.8, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,79,216,${0.08 * a})`;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r * 2.0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(139,92,255,${0.06 * a})`;
+            ctx.fill();
+        } else if ((mode === "romantic" || mode === "sparkle") && s.tint) {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r * 2.2, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,79,216,${0.06 * a})`;
             ctx.fill();
         }
 
-        // romantic haze overlay
-        if (mode === "romantic" || mode === "sparkle") {
-            const g = ctx.createRadialGradient(w * 0.25, h * 0.25, 0, w * 0.25, h * 0.25, Math.max(w, h) * 0.7);
-            g.addColorStop(0, "rgba(255,79,216,0.14)");
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
+        ctx.fill();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, w, h);
+
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+
+            if (s.hold > 0) s.hold -= 1;
+            else {
+                if (Math.random() < 0.012) {
+                    s.target = rand(0.60, 1.0);
+                    s.speed = rand(0.018, 0.045);
+                    s.hold = rand(10, 34);
+                } else if (Math.random() < 0.018) {
+                    s.target = rand(0.10, 0.35);
+                    s.speed = rand(0.010, 0.030);
+                    s.hold = rand(8, 28);
+                }
+            }
+
+            s.a += (s.target - s.a) * s.speed;
+            drawStar(s);
+        }
+
+        if (mode === "romantic" || mode === "sparkle" || mode === "glow") {
+            const g = ctx.createRadialGradient(w * 0.22, h * 0.22, 0, w * 0.22, h * 0.22, Math.max(w, h) * 0.75);
+            g.addColorStop(0, mode === "glow" ? "rgba(255,79,216,0.16)" : "rgba(255,79,216,0.12)");
             g.addColorStop(1, "rgba(0,0,0,0)");
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, w, h);
         }
 
-        // spark particles
         for (let i = sparks.length - 1; i >= 0; i--) {
             const p = sparks[i];
             p.x += p.vx;
             p.y += p.vy;
             p.vy += 0.05 * dpr;
             p.life -= 1;
-            p.a = Math.max(0, p.life / 60);
+
+            const a = clamp(p.life / p.max, 0, 1);
 
             ctx.beginPath();
-            ctx.arc(p.x, p.y, 1.6 * dpr, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255,79,216,${0.55 * p.a})`;
+            ctx.arc(p.x, p.y, 1.4 * dpr, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${0.80 * a})`;
             ctx.fill();
 
             ctx.beginPath();
-            ctx.arc(p.x, p.y, 3.2 * dpr, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(139,92,255,${0.22 * p.a})`;
+            ctx.arc(p.x, p.y, 3.0 * dpr, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,79,216,${0.18 * a})`;
             ctx.fill();
 
             if (p.life <= 0) sparks.splice(i, 1);
@@ -92,7 +138,6 @@ function StarsFX(canvas) {
     }
 
     resize();
-    seed();
     draw();
 
     return { resize, burst, setMode };
